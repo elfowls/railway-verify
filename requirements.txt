@@ -3,3 +3,4 @@ uvicorn
 dnspython
 httpx
 python-multipart
+pydantic
