@@ -6,19 +6,40 @@ import string
 import email.utils
 import uuid
 from collections import defaultdict
+
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional, Dict
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FASTAPI SETUP
+# FASTAPI SETUP WITH CORS
 # ──────────────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="SMTP Email Verifier API",
     description="Batch‐verify email addresses using SMTP‐handshake + timing for catch‐all domains, "
-                "with extended metadata.",
+                "with extended metadata and CORS enabled for bounso.com.",
     version="1.1.0"
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ADD CORS MIDDLEWARE
+# ──────────────────────────────────────────────────────────────────────────────
+
+origins = [
+    "https://bounso.com",
+    "http://bounso.com",
+    # add any other domains you want to allow, e.g.:
+    # "https://app.bounso.com", "https://localhost:3000" (for local testing), etc.
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,            # <-- only these origins will be allowed
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],  # adjust if you need PUT/DELETE etc.
+    allow_headers=["*"],
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -31,19 +52,16 @@ NUM_CALIBRATE = 2
 RCPT_RETRIES = 1
 TIMING_CUSHION = 0.05
 
-# Define a small set of known free-mail domains for demonstration
 FREE_MAIL_DOMAINS = {
     "gmail.com", "yahoo.com", "outlook.com", "hotmail.com",
     "aol.com", "icloud.com", "protonmail.com", "zoho.com"
 }
 
-# Define a small set of known disposable domains for demonstration
 DISPOSABLE_DOMAINS = {
     "mailinator.com", "10minutemail.com", "yopmail.com",
     "tempmail.com", "discard.email", "guerrillamail.com"
 }
 
-# Define role-based local-parts
 ROLE_LOCALS = {
     "admin", "administrator", "support", "info", "sales", "marketing",
     "billing", "webmaster", "postmaster", "contact", "help", "service"
@@ -54,10 +72,36 @@ ROLE_LOCALS = {
 # ──────────────────────────────────────────────────────────────────────────────
 
 class VerifyRequest(BaseModel):
+    """
+    Request:
+      - batch_id (optional)
+      - emails: list of EmailStr
+    """
     batch_id: Optional[str]
     emails: List[EmailStr]
 
 class PerAddressResult(BaseModel):
+    """
+    For each email:
+      - addr: the email address
+      - mx: primary MX host used
+      - mx_provider: "Google", "Microsoft", or "Other/Unknown"
+      - deliverability: "deliverable", "undeliverable", or "risky"
+      - score: float (1.0, 0.5, 0.0)
+      - free: bool
+      - disposable: bool
+      - role: bool
+      - catch_all: bool
+      - result: "valid", "invalid", or "risky"
+      - verification_time: float (seconds)
+      - method: "simple", "timing", or None
+      - status: raw status ("valid", "invalid", "unknown_temp", etc.)
+      - rcpt_code: int (SMTP RCPT code, if available)
+      - rcpt_time: float (seconds for RCPT handshake)
+      - rcpt_msg: str (SMTP RCPT raw response)
+      - data_code: int (if DATA was issued)
+      - data_msg: str (DATA response)
+    """
     addr: EmailStr
     mx: Optional[str] = None
     mx_provider: Optional[str] = None
@@ -243,7 +287,6 @@ def verify_with_timing(mx_host: str, domain: str, from_addr: str, target_addr: s
         smtp_quit(sock)
     except Exception:
         result.status = "connect_failed"
-    # Populate additional fields
     fill_additional_fields(result, domain, catch_all=True)
     result.verification_time = time.time() - start_time
     return result
@@ -279,7 +322,6 @@ def verify_simple(mx_host: str, domain: str, from_addr: str, target_addr: str) -
             result.verification_time = time.time() - start_time
             return result
 
-        # RCPT accepted → DATA
         send_line(sock, "DATA")
         data_resp = recv_line(sock)
         data_code = parse_code(data_resp)
@@ -294,7 +336,6 @@ def verify_simple(mx_host: str, domain: str, from_addr: str, target_addr: str) -
             return result
 
         if data_code == 354:
-            # send full headers
             send_line(sock, f"Date: {email.utils.formatdate(localtime=False)}")
             send_line(sock, f"From: <{from_addr}>")
             send_line(sock, f"To: <{target_addr}>")
@@ -331,7 +372,7 @@ def verify_simple(mx_host: str, domain: str, from_addr: str, target_addr: str) -
 # ──────────────────────────────────────────────────────────────────────────────
 
 def infer_mx_provider(mx_host: str) -> str:
-    mx_lower = mx_host.lower()
+    mx_lower = (mx_host or "").lower()
     if "google" in mx_lower or mx_lower.endswith("gmail.com"):
         return "Google"
     if "outlook" in mx_lower or "office365" in mx_lower or "hotmail" in mx_lower or "live" in mx_lower:
@@ -362,21 +403,14 @@ def infer_score(status: str) -> float:
     return 0.5
 
 def fill_additional_fields(result: PerAddressResult, domain: str, catch_all: bool):
-    # mx and method already set
     result.mx_provider = infer_mx_provider(result.mx or "")
     result.catch_all = catch_all
-
-    # Deliverability & score & result
     result.deliverability = infer_deliverability(result.status or "")
     result.score = infer_score(result.status or "")
-
-    # free or disposable or role
     local_part = result.addr.split("@", 1)[0]
-    result.free = infer_free(domain)
-    result.disposable = infer_disposable(domain)
+    result.free = infer_free(domain or "")
+    result.disposable = infer_disposable(domain or "")
     result.role = infer_role(local_part)
-
-    # final result: valid, invalid, or risky
     if result.status == "valid":
         result.result = "valid"
     elif result.status == "invalid":
@@ -403,6 +437,7 @@ def verify_bulk(address_list: List[str]) -> Dict[str, PerAddressResult]:
         if domain is None:
             for addr in addrs:
                 res = PerAddressResult(addr=addr, status="invalid_format")
+                res.mx = None
                 fill_additional_fields(res, "", catch_all=False)
                 res.verification_time = 0.0
                 results[addr] = res
@@ -433,7 +468,6 @@ def verify_bulk(address_list: List[str]) -> Dict[str, PerAddressResult]:
             avg_fake = calibrate_fake_timing(mx_host, domain, from_addr)
             for addr in addrs:
                 if avg_fake <= 0:
-                    # Cannot calibrate: mark as unknown_catchall
                     res = PerAddressResult(addr=addr)
                     res.method = "timing"
                     res.status = "unknown_catchall"
@@ -443,8 +477,7 @@ def verify_bulk(address_list: List[str]) -> Dict[str, PerAddressResult]:
                     results[addr] = res
                 else:
                     res = verify_with_timing(mx_host, domain, from_addr, addr, avg_fake)
-                    res.mx = mx_host
-                    # The fill_additional_fields call is already inside verify_with_timing
+                    # mx and fill_additional_fields done in verify_with_timing
                     results[addr] = res
 
     return results
