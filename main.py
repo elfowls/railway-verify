@@ -30,15 +30,15 @@ app = FastAPI(
 origins = [
     "https://bounso.com",
     "http://bounso.com",
-    # add any other domains you want to allow, e.g.:
-    # "https://app.bounso.com", "https://localhost:3000" (for local testing), etc.
+    # You may add local dev origins here:
+    # "http://localhost:3000", "http://127.0.0.1:3000"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,            # <-- only these origins will be allowed
+    allow_origins=origins,            
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],  # adjust if you need PUT/DELETE etc.
+    allow_methods=["*"],              
     allow_headers=["*"],
 )
 
@@ -46,7 +46,7 @@ app.add_middleware(
 # CONFIGURATION (Adjust as needed)
 # ──────────────────────────────────────────────────────────────────────────────
 
-FROM_ADDRESS_TEMPLATE = "verify@{}"  # will be formatted with each domain
+FROM_ADDRESS_TEMPLATE = "verify@{}"
 SOCKET_TIMEOUT = 5.0
 NUM_CALIBRATE = 2
 RCPT_RETRIES = 1
@@ -72,36 +72,10 @@ ROLE_LOCALS = {
 # ──────────────────────────────────────────────────────────────────────────────
 
 class VerifyRequest(BaseModel):
-    """
-    Request:
-      - batch_id (optional)
-      - emails: list of EmailStr
-    """
     batch_id: Optional[str]
     emails: List[EmailStr]
 
 class PerAddressResult(BaseModel):
-    """
-    For each email:
-      - addr: the email address
-      - mx: primary MX host used
-      - mx_provider: "Google", "Microsoft", or "Other/Unknown"
-      - deliverability: "deliverable", "undeliverable", or "risky"
-      - score: float (1.0, 0.5, 0.0)
-      - free: bool
-      - disposable: bool
-      - role: bool
-      - catch_all: bool
-      - result: "valid", "invalid", or "risky"
-      - verification_time: float (seconds)
-      - method: "simple", "timing", or None
-      - status: raw status ("valid", "invalid", "unknown_temp", etc.)
-      - rcpt_code: int (SMTP RCPT code, if available)
-      - rcpt_time: float (seconds for RCPT handshake)
-      - rcpt_msg: str (SMTP RCPT raw response)
-      - data_code: int (if DATA was issued)
-      - data_msg: str (DATA response)
-    """
     addr: EmailStr
     mx: Optional[str] = None
     mx_provider: Optional[str] = None
@@ -322,6 +296,7 @@ def verify_simple(mx_host: str, domain: str, from_addr: str, target_addr: str) -
             result.verification_time = time.time() - start_time
             return result
 
+        # RCPT accepted → DATA
         send_line(sock, "DATA")
         data_resp = recv_line(sock)
         data_code = parse_code(data_resp)
@@ -477,7 +452,6 @@ def verify_bulk(address_list: List[str]) -> Dict[str, PerAddressResult]:
                     results[addr] = res
                 else:
                     res = verify_with_timing(mx_host, domain, from_addr, addr, avg_fake)
-                    # mx and fill_additional_fields done in verify_with_timing
                     results[addr] = res
 
     return results
