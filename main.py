@@ -7,19 +7,20 @@ import smtplib, dns.resolver, random, string, time
 app = FastAPI()
 
 # Allow CORS for your frontend
-allow_origins=[
-  "https://bounso.com",
-  "https://www.bounso.com",
-  "https://web-production-cd65d6.up.railway.app"
+allow_origins = [
+    "https://bounso.com",
+    "https://www.bounso.com",
+    "https://web-production-cd65d6.up.railway.app"
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=allow_origins,  # ✅ FIXED
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Email list model
 class EmailList(BaseModel):
