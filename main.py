@@ -1,27 +1,23 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
-import smtplib, dns.resolver, random, string, time
+import smtplib
+import dns.resolver
+import random
+import string
+import time
 
 app = FastAPI()
 
-
-# Allow CORS for your frontend
-allow_origins = [
-    "https://bounso.com",
-    "https://www.bounso.com",
-    "https://web-production-cd65d6.up.railway.app"
-]
-
+# Allow CORS for all origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allow_origins,  # ✅ FIXED
+    allow_origins=["*"],  # Allow all origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # Email list model
 class EmailList(BaseModel):
@@ -138,7 +134,7 @@ def verify_email(email):
         verdict, reason, score, deliverability = "invalid", "RCPT rejected", 0.1, "undeliverable"
     elif all(smtp_check(fake, mx)[0] == 250 for fake in fake_emails):
         if variance < 0.025:
-            verdict, reason, score, deliverability = "risky", "Catch-All - Riksy", 0.5, "risky"
+            verdict, reason, score, deliverability = "risky", "Catch-All - Risky", 0.5, "risky"
         elif delay_diff > 0.02:
             verdict, reason, score, deliverability = "Catch-All likely-valid", "Real delay > fake delay", 0.8, "deliverable"
         else:
