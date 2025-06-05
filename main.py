@@ -73,7 +73,7 @@ ROLE_LOCALS = {
 # ──────────────────────────────────────────────────────────────────────────────
 
 class VerifyRequest(BaseModel):
-    batch_id: Optional[str]
+    batch_id: Optional[str] = None 
     emails: List[EmailStr]
 
 class PerAddressResult(BaseModel):
