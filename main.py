@@ -28,15 +28,12 @@ app = FastAPI(
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://bounso.com",
-        "http://bounso.com",
-        "https://owlsquad.com",
-        "http://owlsquad.com"
-    ],
+    # allow specific domains or regex matching
+    allow_origin_regex=r"https?://(.*\.)?(bounso\.com|owlsquad\.com)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
