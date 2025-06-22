@@ -14,7 +14,17 @@ from pydantic import BaseModel, EmailStr
 from typing import List, Optional, Dict
 
 # ──────────────────────────────────────────────────────────────────────────────
-# FASTAPI SETUP
+# CORS MIDDLEWARE (allow all origins for testing)
+# ──────────────────────────────────────────────────────────────────────────────
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # allow all for testing; restrict in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # ──────────────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="SMTP Email Verifier API",
