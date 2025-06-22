@@ -23,6 +23,18 @@ app = FastAPI(
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
+# CORS MIDDLEWARE (allow all origins for React frontend)
+# ──────────────────────────────────────────────────────────────────────────────
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # adjust to specific domains in production
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+# ──────────────────────────────────────────────────────────────────────────────
 # SETTINGS & GLOBAL EXECUTOR
 # ──────────────────────────────────────────────────────────────────────────────
 FROM_ADDRESS_TEMPLATE = "verify@{}"
