@@ -149,6 +149,7 @@ def detect_catch_all(mx_host: str, domain: str, from_addr: str) -> bool:
     return True
 
 
+
 def calibrate_fake_timing(mx_host: str, domain: str, from_addr: str) -> float:
     times = []
     for _ in range(2):
