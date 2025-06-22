@@ -34,6 +34,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -147,7 +148,6 @@ def detect_catch_all(mx_host: str, domain: str, from_addr: str) -> bool:
         except:
             return False
     return True
-
 
 
 def calibrate_fake_timing(mx_host: str, domain: str, from_addr: str) -> float:
