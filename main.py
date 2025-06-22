@@ -30,7 +30,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://bounso.com",
-        "https://owlsquad.com"
+        "http://bounso.com",
+        "https://owlsquad.com",
+        "http://owlsquad.com"
     ],
     allow_credentials=True,
     allow_methods=["*"],
